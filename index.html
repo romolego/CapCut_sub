@@ -1,1 +1,443 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>CapCut draft JSON → TXT (с/без таймкода)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root {
+    --bg:#ffffff; --card:#f7f8fa; --border:#dcdfe4; --fg:#0b1220; --muted:#6b7280;
+  }
+  html,body{height:100%}
+  body { margin:0; font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; background:var(--bg); color:var(--fg); }
+  .wrap { max-width:1200px; margin:28px auto; padding:0 16px; }
+  h1 { font-size:18px; margin:0 0 12px; }
+  .topbar { display:flex; gap:16px; align-items:stretch; flex-wrap:wrap; }
 
+  .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; }
+  .filecard { padding:8px 12px; }
+  .filebox { display:flex; gap:10px; align-items:center; justify-content:space-between; }
+  label { display:block; margin:6px 0; font-weight:600; }
+
+  input[type=file] {
+    padding:6px; border:1px solid var(--border); border-radius:10px; background:#fff; width:240px;
+  }
+  .btn {
+    display:inline-flex; align-items:center; gap:8px; padding:12px 16px; border-radius:12px; border:1px solid #165dff22;
+    background:linear-gradient(180deg,#2a7bff,#0b6cff); color:#fff; font-weight:600; cursor:pointer; box-shadow:0 6px 16px rgba(11,108,255,.25); user-select:none;
+  }
+  .btn.secondary{ background:#eef3ff; color:#244ea3; border-color:#d9e6ff; box-shadow:none; }
+  .btn.ghost{ background:#fff; color:#0b1220; border:1px solid var(--border); box-shadow:none; }
+  .btn:disabled{opacity:.55; cursor:not-allowed; box-shadow:none; background:#9bbcff; border-color:#9bbcff; color:#fff;}
+  .btnrow{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+
+  .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-top:16px; }
+  @media (max-width:1100px){ .grid3{ grid-template-columns:1fr; } }
+
+  textarea.mono {
+    width:100%; min-height:360px; box-sizing:border-box; background:#fff; color:var(--fg);
+    border:1px solid var(--border); border-radius:12px; padding:12px;
+    font:12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    outline:none; resize:vertical;
+  }
+  textarea.mono:focus { border-color:#9bbcff; box-shadow:0 0 0 3px #0b6cff22; }
+
+  .status { margin-top:8px; color:var(--muted); font-size:12px; }
+
+  .drop {
+    border:2px dashed #c9d6ff; background:#f3f7ff; color:#2a3d8f;
+    border-radius:10px; padding:8px 10px; text-align:center; font-size:12px; min-width:220px;
+  }
+  .drop.drag { border-color:#2a7bff; background:#e9f1ff; color:#0b3ea3; }
+
+  /* Тулбары под окнами: только иконки */
+  .toolbar { display:flex; gap:10px; justify-content:center; margin-top:10px; }
+  .tbtn {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:40px; height:36px;
+    background:#fff; border:1px solid var(--border); color:#0b1220; border-radius:10px; cursor:pointer;
+  }
+  .tbtn svg { width:18px; height:18px; }
+  .tbtn:hover { background:#fdfdfd; }
+
+  /* Чекбокс "Убрать разбивку по файлам" */
+  .grouping { display:none; margin-top:14px; align-items:center; gap:10px; justify-content:center; color:#0b1220; }
+  .grouping input { width:18px; height:18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Локальная обработка CapCut draft JSON → текст</h1>
+
+  <div class="topbar">
+    <div class="card filecard" style="flex:1 1 560px;">
+      <div class="filebox">
+        <div>
+          <label for="file" style="margin:0 0 4px;">Загрузить файл draft JSON</label>
+          <input id="file" type="file" accept=".json,application/json" multiple />
+        </div>
+        <div id="drop" class="drop" title="Перетащите сюда один или несколько JSON">
+          Перетащите файлы сюда
+        </div>
+      </div>
+    </div>
+
+    <div class="card filecard" style="display:flex; align-items:center; gap:10px;">
+      <div class="btnrow">
+        <button id="copyPlainTop" class="btn secondary" disabled>СКОПИРОВАТЬ без таймкода</button>
+        <button id="downloadPlainTop" class="btn" disabled>Скачать TXT без таймкода</button>
+        <button id="clearAll" class="btn ghost">Очистить</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card">
+      <label for="raw">Исходный JSON</label>
+      <textarea id="raw" class="mono" placeholder="Вставьте JSON целиком или загрузите файлы."></textarea>
+      <div class="toolbar" data-for="raw">
+        <!-- Выделить -->
+        <button class="tbtn select" title="Выделить текст">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 3v4M17 3v4"/></svg>
+        </button>
+        <!-- Скопировать -->
+        <button class="tbtn copy" title="Скопировать в буфер">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2"/><rect x="2" y="2" width="13" height="13" rx="2"/></svg>
+        </button>
+        <!-- Скачать -->
+        <button class="tbtn save" title="Скачать .txt">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        </button>
+      </div>
+      <div class="status" id="status">Ожидание данных…</div>
+    </div>
+
+    <div class="card">
+      <label for="withTs">Обработанный текст с таймкодом</label>
+      <textarea id="withTs" class="mono" readonly>—</textarea>
+      <div class="toolbar" data-for="withTs">
+        <button class="tbtn select" title="Выделить текст">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 3v4M17 3v4"/></svg>
+        </button>
+        <button class="tbtn copy" title="Скопировать в буфер">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2"/><rect x="2" y="2" width="13" height="13" rx="2"/></svg>
+        </button>
+        <button class="tbtn save" title="Скачать .txt">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <label for="noTs">Обработанный текст без таймкода</label>
+      <textarea id="noTs" class="mono" readonly>—</textarea>
+      <div class="toolbar" data-for="noTs">
+        <button class="tbtn select" title="Выделить текст">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 3v4M17 3v4"/></svg>
+        </button>
+        <button class="tbtn copy" title="Скопировать в буфер">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2"/><rect x="2" y="2" width="13" height="13" rx="2"/></svg>
+        </button>
+        <button class="tbtn save" title="Скачать .txt">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Чекбокс управления группировкой -->
+  <div id="groupingWrap" class="grouping">
+    <input type="checkbox" id="chkMerge" checked />
+    <label for="chkMerge">Убрать разбивку по файлам</label>
+  </div>
+</div>
+
+<script>
+/* Элементы */
+const fileInp = document.getElementById('file');
+const drop    = document.getElementById('drop');
+const rawTA   = document.getElementById('raw');
+const withTs  = document.getElementById('withTs');
+const noTs    = document.getElementById('noTs');
+const statusEl= document.getElementById('status');
+const btnCopyTop = document.getElementById('copyPlainTop');
+const btnDownTop = document.getElementById('downloadPlainTop');
+const btnClr  = document.getElementById('clearAll');
+
+const groupingWrap = document.getElementById('groupingWrap');
+const chkMerge     = document.getElementById('chkMerge');
+
+/* Состояние: groups = [{ name, cues:[{start,end,text}] }]; removeGrouping = true => без заголовков */
+let groups = [];
+let removeGrouping = true;
+
+/* Утилиты */
+function z(n,w){ return String(n).padStart(w,'0'); }
+function toSRT(ms){
+  const h = Math.floor(ms/3600000);
+  const m = Math.floor((ms%3600000)/60000);
+  const s = Math.floor((ms%60000)/1000);
+  const ms3 = Math.floor(ms%1000);
+  return `${z(h,2)}:${z(m,2)}:${z(s,2)},${z(ms3,3)}`;
+}
+function setStatus(t){ statusEl.textContent = t; }
+
+async function copyText(text){
+  if (!text || text==='—') return;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.style.position='fixed'; ta.style.opacity='0';
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+}
+async function saveTxt(text, suggestedName){
+  if (!text) return;
+  if (window.showSaveFilePicker){
+    try{
+      const handle = await window.showSaveFilePicker({
+        suggestedName,
+        types:[{description:'Text file', accept:{'text/plain':['.txt']}}]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(new Blob([text], {type:'text/plain;charset=utf-8'}));
+      await writable.close();
+      return;
+    }catch(e){ /* отмена — фолбэк */ }
+  }
+  const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = suggestedName;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+}
+
+/* Парсер CapCut draft */
+function parseDraft(obj){
+  const out = [];
+  const list = obj?.extra_info?.subtitle_fragment_info_list;
+  if (!Array.isArray(list)) return out;
+  for (const frag of list){
+    const s = frag?.subtitle_cache_info;
+    if (!s || typeof s !== 'string') continue;
+    let inner;
+    try { inner = JSON.parse(s); } catch(e){ continue; }
+    const arr = inner?.sentence_list;
+    if (!Array.isArray(arr)) continue;
+    for (const it of arr){
+      const t = (it?.text ?? '').trim();
+      const a = it?.start_time, b = it?.end_time;
+      if (t && Number.isFinite(a) && Number.isFinite(b)){
+        out.push({ start:a, end:b, text:t });
+      }
+    }
+  }
+  out.sort((x,y)=> x.start - y.start || x.end - y.end);
+  return out;
+}
+
+/* Рендер */
+function render(){
+  // управление отображением чекбокса
+  groupingWrap.style.display = (groups.length > 1) ? 'flex' : 'none';
+
+  if (!groups.length){
+    withTs.value = '—';
+    noTs.value   = '—';
+    btnCopyTop.disabled = true;
+    btnDownTop.disabled = true;
+    return;
+  }
+
+  let withStr = '';
+  let noStr   = '';
+
+  const multi = groups.length > 1;
+  if (multi && !removeGrouping){
+    // с разбивкой по файлам (заголовки)
+    const partsWith = [];
+    const partsNo   = [];
+    for (const g of groups){
+      if (!g.cues.length) continue;
+      partsWith.push(`По файлу ${g.name}\n`);
+      partsWith.push(g.cues.map(c => `${toSRT(c.start)} --> ${toSRT(c.end)}\n${c.text}`).join('\n\n'));
+      partsWith.push('\n');
+      partsNo.push(`По файлу ${g.name}\n`);
+      partsNo.push(g.cues.map(c => c.text).join('\n'));
+      partsNo.push('\n');
+    }
+    withStr = (partsWith.join('').trim() || '—');
+    noStr   = (partsNo.join('').trim()   || '—');
+  } else {
+    // объединённый вывод без заголовков: конкатенация групп в порядке загрузки
+    const mergedCues = [];
+    for (const g of groups){
+      mergedCues.push(...g.cues);
+    }
+    if (!mergedCues.length){
+      withStr = '—'; noStr = '—';
+    } else {
+      withStr = mergedCues.map(c => `${toSRT(c.start)} --> ${toSRT(c.end)}\n${c.text}`).join('\n\n');
+      noStr   = mergedCues.map(c => c.text).join('\n');
+    }
+  }
+
+  withTs.value = withStr;
+  noTs.value   = noStr;
+  btnCopyTop.disabled = (noStr==='—');
+  btnDownTop.disabled = (noStr==='—');
+}
+
+/* Очистить */
+btnClr.addEventListener('click', ()=>{
+  groups = [];
+  rawTA.value = '';
+  setStatus('Ожидание данных…');
+  render();
+});
+
+/* Переключение чекбокса группировки */
+chkMerge.addEventListener('change', ()=>{
+  removeGrouping = chkMerge.checked;
+  render();
+});
+
+/* Загрузка файла(ов) через input */
+fileInp.addEventListener('change', async (e)=>{
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
+  await handleFilesBatch(files);
+});
+
+/* Drag & Drop */
+;['dragenter','dragover'].forEach(evt=>{
+  drop.addEventListener(evt, e=>{
+    e.preventDefault(); e.stopPropagation(); drop.classList.add('drag');
+  });
+});
+;['dragleave','drop'].forEach(evt=>{
+  drop.addEventListener(evt, e=>{
+    e.preventDefault(); e.stopPropagation(); drop.classList.remove('drag');
+  });
+});
+drop.addEventListener('drop', async (e)=>{
+  const files = Array.from(e.dataTransfer.files || []).filter(f=>/\.json$/i.test(f.name));
+  if (!files.length) return;
+  await handleFilesBatch(files);
+});
+
+/* Правило загрузки:
+   — если одновременно загружено несколько файлов: сохраняем пофайлово в groups и включаем "убрать разбивку" (по умолчанию).
+   — если загружен один файл (в отдельной операции): заменяем предыдущие данные.
+*/
+async function handleFilesBatch(files){
+  setStatus('Чтение файлов…');
+  const raws = [];
+  const newGroups = [];
+
+  for (const f of files){
+    try{
+      const text = await f.text();
+      raws.push(`// ---- ${f.name} ----\n${text}\n`);
+      let obj;
+      try{ obj = JSON.parse(text); } catch(e){ continue; }
+      const cues = parseDraft(obj);
+      newGroups.push({ name:f.name, cues });
+    }catch(e){ /* пропуск */ }
+  }
+
+  if (files.length === 1){
+    // одиночная операция — замена старых данных
+    groups = newGroups;
+    rawTA.value = raws.join('\n');
+  } else {
+    // множественная операция — объединяем текущий ввод в блок, но оставляем пофайловую детализацию
+    groups = newGroups;
+    rawTA.value = raws.join('\n');
+    // по умолчанию без разбивки (чекбокс активен)
+    removeGrouping = true;
+    chkMerge.checked = true;
+  }
+
+  setStatus('Готово');
+  render();
+}
+
+/* Ручной ввод JSON (один) — всегда замена старых данных */
+rawTA.addEventListener('input', ()=>{
+  const text = rawTA.value;
+  if (!text.trim()){
+    groups = [];
+    setStatus('Ожидание данных…');
+    render();
+    return;
+  }
+  try{
+    const obj = JSON.parse(text);
+    const cues = parseDraft(obj);
+    groups = [{ name:'manual', cues }];
+    setStatus(cues.length ? 'Готово' : 'Субтитры не найдены в ожидаемой структуре');
+  }catch(e){
+    setStatus('Ошибка: невалидный JSON');
+    groups = [];
+  }
+  // ручной ввод — одиночный, разбивка не нужна
+  removeGrouping = true;
+  chkMerge.checked = true;
+  render();
+});
+
+/* Верх: Копировать/Скачать (без таймкода) */
+btnCopyTop.addEventListener('click', async ()=>{
+  await copyText(noTs.value);
+});
+btnDownTop.addEventListener('click', async ()=>{
+  const text = noTs.value;
+  if (!text || text==='—') return;
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = z(now.getMonth()+1,2);
+  const d = z(now.getDate(),2);
+  const defaultName = `${y} - ${m} - ${d} - .txt`;
+  await saveTxt(text, defaultName);
+});
+
+/* Тулбары под каждым окном */
+document.querySelectorAll('.toolbar').forEach(tb=>{
+  const forId = tb.getAttribute('data-for');
+  const ta = document.getElementById(forId);
+  const btnSel  = tb.querySelector('.tbtn.select');
+  const btnCopy = tb.querySelector('.tbtn.copy');
+  const btnSave = tb.querySelector('.tbtn.save');
+
+  btnSel.addEventListener('click', ()=>{
+    ta.focus();
+    ta.select();
+  });
+
+  btnCopy.addEventListener('click', async ()=>{
+    await copyText(ta.value);
+  });
+
+  btnSave.addEventListener('click', async ()=>{
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = z(now.getMonth()+1,2);
+    const d = z(now.getDate(),2);
+    const base = (forId==='withTs') ? 'with-timestamps' : (forId==='noTs' ? 'no-timestamps' : 'raw');
+    const name = `${y} - ${m} - ${d} - ${base}.txt`;
+    await saveTxt(ta.value, name);
+  });
+});
+</script>
+</body>
+</html>
