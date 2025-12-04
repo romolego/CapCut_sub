@@ -86,7 +86,7 @@
   }
   .accordion-tab:hover { background:#e9efff; }
   .accordion-tab--active { background:#2a7bff; color:#fff; border-color:#2a7bff; box-shadow:0 6px 16px rgba(11,108,255,.25); }
-  .accordion-content { margin-top:12px; margin-bottom:32px; display:none; }
+  .accordion-content { margin-top:12px; margin-bottom:56px; padding-bottom:12px; display:none; }
   .accordion-content.visible { display:block; }
   .accordion-content .copy-prompt { margin-bottom:10px; }
   .prompt-text { margin:0; white-space:pre-wrap; font:13px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; }
@@ -107,8 +107,6 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Локальная обработка CapCut draft JSON → текст</h1>
-
   <div class="topbar">
     <div class="card filecard" style="flex:1 1 560px;">
       <div class="filebox">
@@ -375,6 +373,7 @@ function render(){
   if (!groups.length){
     withTs.value = '—';
     noTs.value   = '—';
+    noTs.classList.remove('has-content');
     btnCopyTop.disabled = true;
     btnDownTop.disabled = true;
     return;
@@ -414,14 +413,11 @@ function render(){
   }
 
   withTs.value = withStr;
-  if (noStr && noStr !== '—' && noStr.trim() !== '') {
-    noTs.classList.add('has-content');
-  } else {
-    noTs.classList.remove('has-content');
-  }
+  const hasNoTsContent = Boolean(noStr && noStr !== '—' && noStr.trim() !== '');
+  noTs.classList.toggle('has-content', hasNoTsContent);
   noTs.value   = noStr;
-  btnCopyTop.disabled = (noStr==='—');
-  btnDownTop.disabled = (noStr==='—');
+  btnCopyTop.disabled = !hasNoTsContent;
+  btnDownTop.disabled = !hasNoTsContent;
 }
 
 /* Очистить */
