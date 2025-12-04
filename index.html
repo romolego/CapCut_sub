@@ -43,6 +43,7 @@
     outline:none; resize:vertical;
   }
   textarea.mono:focus { border-color:#9bbcff; box-shadow:0 0 0 3px #0b6cff22; }
+  textarea.mono.has-content { border-color:#000000; }
 
   .status { margin-top:8px; color:var(--muted); font-size:12px; }
 
@@ -68,9 +69,12 @@
 
   /* Аккордеоны */
   .accordion-panel { margin-top:18px; }
-  .accordion-bar { display:flex; gap:10px; flex-wrap:nowrap; }
+  .accordion-bar { display:flex; gap:8px; overflow-x:auto; }
   .accordion-tab {
-    flex:1 1 0;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 auto;
     padding:12px 14px;
     border-radius:12px;
     border:1px solid #cfd8f3;
@@ -82,10 +86,23 @@
   }
   .accordion-tab:hover { background:#e9efff; }
   .accordion-tab--active { background:#2a7bff; color:#fff; border-color:#2a7bff; box-shadow:0 6px 16px rgba(11,108,255,.25); }
-  .accordion-content { margin-top:10px; display:none; }
+  .accordion-content { margin-top:12px; margin-bottom:32px; display:none; }
   .accordion-content.visible { display:block; }
   .accordion-content .copy-prompt { margin-bottom:10px; }
   .prompt-text { margin:0; white-space:pre-wrap; font:13px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; }
+
+  #copyToast {
+    position:fixed;
+    right:16px;
+    bottom:16px;
+    z-index:9999;
+    background:rgba(0,0,0,0.8);
+    color:#fff;
+    border-radius:8px;
+    padding:8px 12px;
+    display:none;
+    pointer-events:none;
+  }
 </style>
 </head>
 <body>
@@ -184,6 +201,8 @@
   </div>
 </div>
 
+<div id="copyToast">Скопировано</div>
+
 <template id="tpl-help">
   <div class="accordion-section">
     <p><strong>Порядок действий для извлечения субтитров из CapCut:</strong></p>
@@ -257,6 +276,7 @@ const accordionTabs = document.querySelectorAll('.accordion-tab');
 
 let currentTab = null;
 const dragCounters = new WeakMap();
+let copyToastTimer = null;
 
 /* Состояние: groups = [{ name, cues:[{start,end,text}] }]; removeGrouping = true => без заголовков */
 let groups = [];
@@ -273,6 +293,16 @@ function toSRT(ms){
 }
 function setStatus(t){ statusEl.textContent = t; }
 
+function showCopyToast(){
+  const el = document.getElementById('copyToast');
+  if (!el) return;
+  el.style.display = 'block';
+  if (copyToastTimer) clearTimeout(copyToastTimer);
+  copyToastTimer = setTimeout(()=>{
+    el.style.display = 'none';
+  }, 1500);
+}
+
 async function copyText(text){
   if (!text || text==='—') return;
   try {
@@ -286,6 +316,7 @@ async function copyText(text){
     document.execCommand('copy');
     document.body.removeChild(ta);
   }
+  showCopyToast();
 }
 async function saveTxt(text, suggestedName){
   if (!text) return;
@@ -383,6 +414,11 @@ function render(){
   }
 
   withTs.value = withStr;
+  if (noStr && noStr !== '—' && noStr.trim() !== '') {
+    noTs.classList.add('has-content');
+  } else {
+    noTs.classList.remove('has-content');
+  }
   noTs.value   = noStr;
   btnCopyTop.disabled = (noStr==='—');
   btnDownTop.disabled = (noStr==='—');
@@ -583,8 +619,14 @@ document.querySelectorAll('.toolbar').forEach(tb=>{
     const y = now.getFullYear();
     const m = z(now.getMonth()+1,2);
     const d = z(now.getDate(),2);
-    const base = (forId==='withTs') ? 'with-timestamps' : (forId==='noTs' ? 'no-timestamps' : 'raw');
-    const name = `${y} - ${m} - ${d} - ${base}.txt`;
+    let name = `${y} - ${m} - ${d} - исходные субтитры.txt`;
+    if (forId === 'raw'){
+      name = `${y} - ${m} - ${d} - исходные субтитры в JSON.txt`;
+    } else if (forId === 'withTs'){
+      name = `${y} - ${m} - ${d} - исходные субтитры с таймкодом.txt`;
+    } else if (forId === 'noTs'){
+      name = `${y} - ${m} - ${d} - исходные субтитры без таймкода.txt`;
+    }
     await saveTxt(ta.value, name);
   });
 });
