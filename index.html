@@ -15,6 +15,8 @@
   .topbar { display:flex; gap:16px; align-items:stretch; flex-wrap:wrap; }
 
   .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; }
+  .card-source { background:#f6f9ff; border:2px dashed #c9d6ff; }
+  .card-source.drag { border-color:#2a7bff; box-shadow:0 0 0 3px #0b6cff22; background:#e9f1ff; }
   .filecard { padding:8px 12px; }
   .filebox { display:flex; gap:10px; align-items:center; justify-content:space-between; }
   label { display:block; margin:6px 0; font-weight:600; }
@@ -63,6 +65,27 @@
   /* Чекбокс "Убрать разбивку по файлам" */
   .grouping { display:none; margin-top:14px; align-items:center; gap:10px; justify-content:center; color:#0b1220; }
   .grouping input { width:18px; height:18px; }
+
+  /* Аккордеоны */
+  .accordion-panel { margin-top:18px; }
+  .accordion-bar { display:flex; gap:10px; flex-wrap:nowrap; }
+  .accordion-tab {
+    flex:1 1 0;
+    padding:12px 14px;
+    border-radius:12px;
+    border:1px solid #cfd8f3;
+    background:#f5f7ff;
+    color:#1f3368;
+    font-weight:600;
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .accordion-tab:hover { background:#e9efff; }
+  .accordion-tab--active { background:#2a7bff; color:#fff; border-color:#2a7bff; box-shadow:0 6px 16px rgba(11,108,255,.25); }
+  .accordion-content { margin-top:10px; display:none; }
+  .accordion-content.visible { display:block; }
+  .accordion-content .copy-prompt { margin-bottom:10px; }
+  .prompt-text { margin:0; white-space:pre-wrap; font:13px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; }
 </style>
 </head>
 <body>
@@ -92,7 +115,7 @@
   </div>
 
   <div class="grid3">
-    <div class="card">
+    <div class="card card-source" id="rawCard">
       <label for="raw">Исходный JSON</label>
       <textarea id="raw" class="mono" placeholder="Вставьте JSON целиком или загрузите файлы."></textarea>
       <div class="toolbar" data-for="raw">
@@ -150,13 +173,76 @@
     <input type="checkbox" id="chkMerge" checked />
     <label for="chkMerge">Убрать разбивку по файлам</label>
   </div>
+
+  <div class="accordion-panel">
+    <div class="accordion-bar">
+      <button data-tab="help" class="accordion-tab">Краткая инструкция</button>
+      <button data-tab="cleanup" class="accordion-tab">Промпт для правки текста</button>
+      <button data-tab="summary" class="accordion-tab">Промпт резюме транскрибации</button>
+    </div>
+    <div id="accordionContent" class="accordion-content card"></div>
+  </div>
 </div>
+
+<template id="tpl-help">
+  <div class="accordion-section">
+    <p><strong>Порядок действий для извлечения субтитров из CapCut:</strong></p>
+    <ol>
+      <li>Скачайте и установите CapCut, затем запустите программу.</li>
+      <li>Нажмите «Создать проект».</li>
+      <li>Перенесите в созданный проект аудио- или видеофайл.</li>
+      <li>Откройте вкладку «Субтитры» и внизу нажмите кнопку «Создать».</li>
+      <li>
+        Дождитесь генерации субтитров.
+        <ul>
+          <li>Максимальная длительность, которую можно обработать за один раз, — около 2 часов.</li>
+          <li>Если ролик немного длиннее (до 2,5 часов), можно ускорить видео — распознавание в целом будет корректным.</li>
+          <li>Если ролик существенно длиннее, нарежьте его на части и генерируйте субтитры для каждой части отдельно. Для нарезки: выделите дорожку, установите полосу в нужное место и нажмите Ctrl+B.</li>
+        </ul>
+      </li>
+      <li>После генерации субтитров откройте системную папку с проектами CapCut (по умолчанию: C:\Users\ИМЯ_ПОЛЬЗОВАТЕЛЯ_ПК\AppData\Local\CapCut\User Data\Projects\com.lveditor.draft\Текущий_месяц+день). Найдите файл draft_content.json, перенесите его в данный сервис и выполните обработку.</li>
+    </ol>
+  </div>
+</template>
+
+<template id="tpl-cleanup">
+  <div class="accordion-section">
+    <button class="btn secondary copy-prompt" type="button">Скопировать</button>
+    <pre class="prompt-text">Я направляю тебе сырую транскрибацию устной речи, полученную из автогенерации субтитров.
+В тексте могут отсутствовать знаки препинания, встречаться повторы, слова-паразиты и опечатки распознавания.
+Твоя задача:
+1. Аккуратно расставить знаки препинания и разбить текст на предложения в соответствии с нормами русского языка.
+2. Исправить только очевидные орфографические ошибки и ошибки распознавания (там, где по контексту ясно, какое слово имелось в виду).
+3. Удалить слова-паразиты и устные вставки («ээ», «ну», «как бы», «типа», «короче», и т. п.), если их удаление не меняет смысл фразы.
+4. Сохранить стиль и содержание высказываний: не пересказывать текст своими словами, не сокращать его и не добавлять новых смыслов.
+Итоговый результат должен представлять собой читабельный текст, максимально близкий к исходной речи, но очищенный от технических артефактов распознавания.</pre>
+  </div>
+</template>
+
+<template id="tpl-summary">
+  <div class="accordion-section">
+    <button class="btn secondary copy-prompt" type="button">Скопировать</button>
+    <pre class="prompt-text">Я направляю тебе сырую транскрибацию встречи (беседы), полученную из автогенерации субтитров.
+В тексте могут отсутствовать знаки препинания, встречаться повторы, слова-паразиты и отдельные опечатки распознавания, но в целом смысл сохранён.
+Твоя задача:
+1. Проанализировать транскрибацию и понять, какие темы и вопросы обсуждались.
+2. Составить структурированное резюме встречи в виде краткого отчёта.
+3. В отдельные блоки вынести:
+– основные темы и предмет обсуждения;
+– ключевые тезисы и аргументы участников;
+– принятые решения и договорённости (что решили делать, кто за что отвечает, какие сроки или ориентиры обсуждались);
+– открытые вопросы, риски и договорённости «уточнить позже».
+4. Оформить итог в виде читаемого текста с подзаголовками и маркированными списками там, где это уместно.
+Не нужно дословно переписывать всю транскрибацию. Нужен именно осмысленный конспект/резюме по содержанию встречи.</pre>
+  </div>
+</template>
 
 <script>
 /* Элементы */
 const fileInp = document.getElementById('file');
 const drop    = document.getElementById('drop');
 const rawTA   = document.getElementById('raw');
+const rawCard = document.getElementById('rawCard');
 const withTs  = document.getElementById('withTs');
 const noTs    = document.getElementById('noTs');
 const statusEl= document.getElementById('status');
@@ -166,6 +252,11 @@ const btnClr  = document.getElementById('clearAll');
 
 const groupingWrap = document.getElementById('groupingWrap');
 const chkMerge     = document.getElementById('chkMerge');
+const accordionContent = document.getElementById('accordionContent');
+const accordionTabs = document.querySelectorAll('.accordion-tab');
+
+let currentTab = null;
+const dragCounters = new WeakMap();
 
 /* Состояние: groups = [{ name, cues:[{start,end,text}] }]; removeGrouping = true => без заголовков */
 let groups = [];
@@ -319,21 +410,42 @@ fileInp.addEventListener('change', async (e)=>{
 });
 
 /* Drag & Drop */
-;['dragenter','dragover'].forEach(evt=>{
-  drop.addEventListener(evt, e=>{
-    e.preventDefault(); e.stopPropagation(); drop.classList.add('drag');
+function attachJsonDropZone(zone, highlightTarget = zone){
+  const hasFiles = e => Array.from(e.dataTransfer?.types || []).includes('Files');
+  const counter = dragCounters.get(highlightTarget) || { count:0 };
+  dragCounters.set(highlightTarget, counter);
+
+  zone.addEventListener('dragenter', e=>{
+    if (!hasFiles(e)) return;
+    counter.count++;
+    e.preventDefault(); e.stopPropagation();
+    highlightTarget.classList.add('drag');
   });
-});
-;['dragleave','drop'].forEach(evt=>{
-  drop.addEventListener(evt, e=>{
-    e.preventDefault(); e.stopPropagation(); drop.classList.remove('drag');
+  zone.addEventListener('dragover', e=>{
+    if (!hasFiles(e)) return;
+    e.preventDefault(); e.stopPropagation();
   });
-});
-drop.addEventListener('drop', async (e)=>{
-  const files = Array.from(e.dataTransfer.files || []).filter(f=>/\.json$/i.test(f.name));
-  if (!files.length) return;
-  await handleFilesBatch(files);
-});
+  zone.addEventListener('dragleave', e=>{
+    if (!hasFiles(e)) return;
+    counter.count = Math.max(0, counter.count-1);
+    if (counter.count === 0){
+      highlightTarget.classList.remove('drag');
+    }
+    e.preventDefault(); e.stopPropagation();
+  });
+  zone.addEventListener('drop', async (e)=>{
+    counter.count = 0;
+    highlightTarget.classList.remove('drag');
+    const files = Array.from(e.dataTransfer?.files || []).filter(f=>/\.json$/i.test(f.name));
+    if (!files.length) return;
+    e.preventDefault(); e.stopPropagation();
+    await handleFilesBatch(files);
+  });
+}
+
+attachJsonDropZone(drop, drop);
+attachJsonDropZone(rawCard, rawCard);
+attachJsonDropZone(rawTA, rawCard);
 
 /* Правило загрузки:
    — если одновременно загружено несколько файлов: сохраняем пофайлово в groups и включаем "убрать разбивку" (по умолчанию).
@@ -396,6 +508,44 @@ rawTA.addEventListener('input', ()=>{
   render();
 });
 
+/* Аккордеоны */
+function setAccordionContent(tab){
+  const tpl = document.getElementById(`tpl-${tab}`);
+  if (!tpl){
+    accordionContent.innerHTML = '';
+    accordionContent.classList.remove('visible');
+    return;
+  }
+  accordionContent.innerHTML = tpl.innerHTML;
+  accordionContent.classList.add('visible');
+}
+
+accordionTabs.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const tab = btn.getAttribute('data-tab');
+    if (currentTab === tab){
+      currentTab = null;
+      accordionTabs.forEach(b=>b.classList.remove('accordion-tab--active'));
+      accordionContent.innerHTML = '';
+      accordionContent.classList.remove('visible');
+      return;
+    }
+    currentTab = tab;
+    accordionTabs.forEach(b=>{
+      b.classList.toggle('accordion-tab--active', b === btn);
+    });
+    setAccordionContent(tab);
+  });
+});
+
+accordionContent.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('.copy-prompt');
+  if (!btn) return;
+  const textEl = accordionContent.querySelector('.prompt-text');
+  if (!textEl) return;
+  await copyText(textEl.textContent.trim());
+});
+
 /* Верх: Копировать/Скачать (без таймкода) */
 btnCopyTop.addEventListener('click', async ()=>{
   await copyText(noTs.value);
@@ -407,7 +557,7 @@ btnDownTop.addEventListener('click', async ()=>{
   const y = now.getFullYear();
   const m = z(now.getMonth()+1,2);
   const d = z(now.getDate(),2);
-  const defaultName = `${y} - ${m} - ${d} - .txt`;
+  const defaultName = `${y} - ${m} - ${d} - исходные субтитры.txt`;
   await saveTxt(text, defaultName);
 });
 
